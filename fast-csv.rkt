@@ -17,13 +17,13 @@
       [(null? ys) #t]
       [else
         (not (= (car xs) (car ys)))]))
-  
+
   (define (field-token? v)
     (and (pair? v)
          (let ([a (car v)]
                [d (cdr v)])
            (<= a d))))
-  
+
   (define statef/c
     (->i ([i nonnegative-integer?]
           [cs (i) (or/c null? (cons/c (>=/c i) (listof nonnegative-integer?)))]
@@ -40,7 +40,7 @@
 
 (define (last-break buf)
   (for/or ([i (in-range (sub1 (bytes-length buf)) -1 -1)])
-    (if (= (bytes-ref buf i) #x0a) i #f)))
+    (if (= (bytes-ref buf i) #x0a) (add1 i) #f)))
 
 (define (scan-indexes buf [blen (bytes-length buf)])
   (for/fold ([commas null]
@@ -101,7 +101,7 @@
 
   (in-field 0 cs qs bs))
 
-(define (make-fast-csv-reader inp [bufsize 1024])
+(define (make-fast-csv-chunk-reader inp bufsize)
   (define buf (make-bytes bufsize))
   (define insert-pos 0)
   (define at-end? #f)
@@ -123,10 +123,23 @@
     (define-values (cs qs bs) (scan-indexes buf scan-end))
     (define tokens (indexes->tokens cs qs bs))
     (define records (build-records tokens))
-    (bytes-copy! buf 0 buf (add1 scan-end))
-    (set! insert-pos (- bufsize scan-end 1))
+    (bytes-copy! buf 0 buf scan-end)
+    (set! insert-pos (- bufsize scan-end))
     records)
   (lambda ()
     (and (not at-end?)
          (read-chunk))))
+
+(define (make-fast-csv-reader inp [bufsize 1024])
+  (define pending null)
+  (define read-chunk (make-fast-csv-chunk-reader inp bufsize))
+  (lambda ()
+    (when (and pending (null? pending))
+      (set! pending (read-chunk)))
+    (cond
+      [(not pending) pending]
+      [else
+        (define cur (car pending))
+        (set! pending (cdr pending))
+        cur])))
 
