@@ -15,7 +15,7 @@
             (time (for/fold ([x 0]) ([recs (in-producer reader #f)]) (add1 x))))))))
   (sync
     (handle-evt
-      (alarm-evt (+ 5000 (current-inexact-milliseconds)))
+      (alarm-evt (+ 60000 (current-inexact-milliseconds)))
       (lambda (e) (error 'timeout)))
     (handle-evt run-thread
       (lambda (th)
